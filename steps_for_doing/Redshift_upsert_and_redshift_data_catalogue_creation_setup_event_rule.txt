@@ -33,3 +33,7 @@ This event pattern is useful when you want to automate actions that depend on th
 1. Initiating an upsert operation in Amazon Redshift.
 2. Sending notifications about job completion.
 3. Triggering subsequent data processing or analysis tasks.
+
+
+
+#Once This Glue ran succesfullly create event bridge rule to trigger the SNS to send SMS or email and then this SNS will also trigger the lambda (add lambda's trigger as same SNS) to archive the data in s3 from source s3

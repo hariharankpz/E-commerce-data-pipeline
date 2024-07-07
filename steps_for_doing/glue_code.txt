@@ -1,0 +1,71 @@
+Step 1: Extract Data from S3 and Load into Glue DataFrames
+
+import sys
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+import pyspark.sql.functions as F
+
+# Initialize Glue context
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+# Load data from S3
+transactions_df = glueContext.create_dynamic_frame.from_catalog(
+    database="your_database_name", 
+    table_name="s3_transactions_table"
+).toDF()
+
+dim_customers_df = glueContext.create_dynamic_frame.from_catalog(
+    database="your_database_name", 
+    table_name="dim_customers"
+).toDF()
+
+dim_products_df = glueContext.create_dynamic_frame.from_catalog(
+    database="your_database_name", 
+    table_name="dim_products"
+).toDF()
+
+
+Step 2: Enrich Transactional Data with Join Operations
+
+# Join with dim_customers and dim_products
+transactions_enriched_df = transactions_df \
+    .join(dim_customers_df, transactions_df.customer_id == dim_customers_df.customer_id, 'left') \
+    .join(dim_products_df, transactions_df.product_id == dim_products_df.product_id, 'left')
+
+
+Step 3: Data Validation
+
+# Filter out invalid transactions
+transactions_valid_df = transactions_enriched_df \
+    .filter(F.col("dim_customers.customer_id").isNotNull() & F.col("dim_products.product_id").isNotNull())
+
+
+Step 4: Additional Transformations
+# Calculate total transaction amount
+transactions_valid_df = transactions_valid_df.withColumn(
+    "total_amount", F.col("quantity") * F.col("price")
+)
+
+# Categorize transactions
+transactions_valid_df = transactions_valid_df.withColumn(
+    "transaction_class", 
+    F.when(F.col("total_amount") < 50, "Small")
+     .when((F.col("total_amount") >= 50) & (F.col("total_amount") < 200), "Medium")
+     .otherwise("Large")
+)
+
+
+#Once this done refer the video for upsert the Redshit table https://www.youtube.com/watch?v=3ZFv7F6MK18
+
+#Once This Glue ran succesfullly create event bridge rule to trigger the SNS to send SMS or email and then this SNS will also trigger the lambda (add lambda's trigger as same SNS) to archive the data in s3 from source s3
+
+
+
